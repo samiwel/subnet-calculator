@@ -1,23 +1,27 @@
+// @ts-check
+
 import {Netmask} from "netmask";
 import {useEffect, useState} from "react";
-import {insert} from "lodash";
-
 
 
 class TreeNode {
-    constructor(value, children = []) {
+    /**
+     * @param {Netmask} value
+     * @param {Netmask?} parent
+     */
+    constructor(value, parent=null) {
         this.parent = parent;
         this.value = value;
-        this.children = children;
     }
+
+    get cidr() {
+        return `${this.value.base}/${this.value.bitmask}`
+    }
+    
 }
 
-const getNetmask = cidr => {
+const getNetmask = (cidr) => {
     const block = new Netmask(cidr);
-    // console.log({
-    //     input: cidr,
-    //     output: block,
-    // })
     return block;
 }
 
@@ -32,12 +36,8 @@ const Home = () => {
     const [subnets, setSubnets] = useState([])
 
     useEffect(() => {
-
         const root = new TreeNode(getNetmask(cidr));
-        
-
-
-setSubnets([getNetmask(cidr)])
+        setSubnets([root])
     }, [])
 
     const onSubmit = e => {
@@ -46,14 +46,14 @@ setSubnets([getNetmask(cidr)])
     }
 
     const divide = origin => {
-        const block1 = getNetmask(`${origin.base}/${origin.bitmask + 1}`);
-        const block2 = block1.next();
-        childToParent[`${block1.base}/${block1.bitmask}`] = origin;
-        childToParent[`${block2.base}/${block2.bitmask}`] = origin;
+        const block1 = new TreeNode(getNetmask(`${origin.base}/${origin.bitmask + 1}`), origin);
+        const block2 = new TreeNode(block1.value.next(), origin);
+        childToParent[block1.cidr] = origin;
+        childToParent[block2.cidr] = origin;
 
         const newSubnetList = [...subnets];
         const originIndex = newSubnetList.findIndex((item) => {
-            return item === origin;
+            return item.value.cidr === origin.cidr;
         });
 
         newSubnetList.splice(originIndex, 1, block1);
@@ -89,15 +89,29 @@ setSubnets([getNetmask(cidr)])
                 </tr>
                 </thead>
                 <tbody>
-                {subnets.map(subnet => (
-                    <tr key={`${subnet.netLong}${subnet.maskLong}`}>
-                        <td>{`${subnet.base}/${subnet.bitmask}`}</td>
-                        <td>{subnet.mask}</td>
-                        <td>{`${subnet.base}`}{subnet.bitmask < 32 && `- ${subnet.broadcast || subnet.last}`}</td>
-                        <td>{`${subnet.first}`}{subnet.bitmask < 32 && `- ${subnet.last}`}</td>
-                        <td>{subnet.bitmask === 32 ? 1 : subnet.bitmask === 31 ? 2 : subnet.size - 2}</td>
+                {rootTreeNode && (
+                    <tr>
+                        <td>{`${rootTreeNode.value.base}/${rootTreeNode.value.bitmask}`}</td>
+                        <td>{rootTreeNode.value.mask}</td>
+                        <td>{`${rootTreeNode.value.base}`}{rootTreeNode.value.bitmask < 32 && `- ${rootTreeNode.value.broadcast || rootTreeNode.value.last}`}</td>
+                        <td>{`${rootTreeNode.value.first}`}{rootTreeNode.value.bitmask < 32 && `- ${rootTreeNode.value.last}`}</td>
+                        <td>{rootTreeNode.value.bitmask === 32 ? 1 : rootTreeNode.value.bitmask === 31 ? 2 : rootTreeNode.value.size - 2}</td>
                         <td>
-                            <button disabled={subnet.bitmask === 32} onClick={() => divide(subnet)}>Divide</button>    
+                            <button disabled={rootTreeNode.value.bitmask === 32} onClick={() => divide(rootTreeNode.value)}>Divide</button>    
+                        </td>
+                    </tr>
+                )}
+
+
+                {subnets.map(subnet => (
+                    <tr key={`${subnet.value.netLong}${subnet.value.maskLong}`}>
+                        <td>{`${subnet.value.base}/${subnet.value.bitmask}`}</td>
+                        <td>{subnet.value.mask}</td>
+                        <td>{`${subnet.value.base}`}{subnet.value.bitmask < 32 && `- ${subnet.value.broadcast || subnet.value.last}`}</td>
+                        <td>{`${subnet.value.first}`}{subnet.value.bitmask < 32 && `- ${subnet.value.last}`}</td>
+                        <td>{subnet.value.bitmask === 32 ? 1 : subnet.value.bitmask === 31 ? 2 : subnet.value.size - 2}</td>
+                        <td>
+                            <button disabled={subnet.value.bitmask === 32} onClick={() => divide(subnet.value)}>Divide</button>    
                         </td>
                         {hasRowsToJoin && (
                             <td rowSpan={2}>
